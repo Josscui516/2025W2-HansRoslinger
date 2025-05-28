@@ -2,6 +2,7 @@ import { handleDrag } from "./actions/handleDrag";
 import { handleResize } from "./actions/handleResize";
 import { handleHover } from "./actions/handleHover";
 import { useVisualStore } from "store/visualsSlice";
+
 import {
   ActionPayload,
   HandIds,
@@ -47,11 +48,13 @@ export class InteractionManager {
 
   /**
    * Clear threshold prevents flicker when pinch gestures are too fast.
-   * Without it: pinch → empty → empty → pinch. Will result in loss of target visual
-   * With threshold: pinch → pinch. Does not clear target when the number of consecutive none is less then threshold
    */
   private readonly CLEAR_THRESHOLD = 3;
   private currentClearCount = 0;
+
+  // Track last simulated pointer position and target to prevent spamming events
+  private lastSimulatedPosition: { x: number; y: number } | null = null;
+  private lastSimulatedTargetId: string | null = null;
 
   private get visuals() {
     return useVisualStore.getState().visuals;
@@ -65,7 +68,6 @@ export class InteractionManager {
    * Called by `useGestureListener` with mapped ActionPayloads.
    */
   handleAction(actionPayload: ActionPayload) {
-    // reset count
     this.currentClearCount = 0;
     this.handVisualMap[actionPayload.handId].clearCount = 0;
 
@@ -76,7 +78,6 @@ export class InteractionManager {
 
     if (!coordinates || coordinates.length === 0) return;
 
-    // Use the first gesture point as the targeting reference
     const point = coordinates[0];
     const target = this.findTargetAt(point);
 
@@ -270,14 +271,15 @@ export class InteractionManager {
     currentHand.clearCount += 1;
   }
 
+
   /**
-   * Finds the visual (if any) currently under the given pointer position.
-   * Used when no targetId is explicitly provided by the interaction stream.
-   *
-   * @param position - The current pointer position (x, y) relative to canvas
-   * @returns first visual (with the highest index) that contains the pointer, or null if none match
+   * Finds the visual under pointer position.
+   * Also automatically runs pointer event simulation on the Vega canvas at the pointer position,
+   * but only if the position or target changed (to avoid spamming events).
    */
   private findTargetAt(position: { x: number; y: number }): Visual | null {
+    console.log("[Manager] Finding target at position:", position);
+
     for (const visual of [...this.visuals].reverse()) {
       const { x, y } = visual.position;
       const { width, height } = visual.size;
@@ -289,12 +291,86 @@ export class InteractionManager {
         position.y <= y + height;
 
       if (withinBounds) {
-      console.log('[Manager] Found target ${visual.assetId} under pointer at (${position.x}, ${position.y})'
-      );
-      return visual;
+        console.log(
+          `[Manager] Found target ${visual.assetId} under pointer at (${position.x}, ${position.y})`
+        );
+
+        // Only simulate pointer events if position or target changed
+        if (
+          !this.lastSimulatedPosition ||
+          this.lastSimulatedPosition.x !== position.x ||
+          this.lastSimulatedPosition.y !== position.y ||
+          this.lastSimulatedTargetId !== visual.assetId
+        ) {
+          this.simulatePointerEvents(position);
+          this.lastSimulatedPosition = position;
+          this.lastSimulatedTargetId = visual.assetId;
+        }
+
+        return visual;
+      }
     }
-    }
+
+    console.log("[Manager] No target found at position:", position);
+
+    // Clear last simulated state if no target
+    this.lastSimulatedPosition = null;
+    this.lastSimulatedTargetId = null;
+
     return null;
+  }
+
+  /**
+   * Simulate mouse pointer events at given viewport coordinates.
+   */
+  simulatePointerEvents(position: { x: number; y: number }) {
+    if (!position) return;
+
+    const { x, y } = position;
+
+    const canvas = document.querySelector(".vega-embed canvas");
+    if (!canvas) {
+      console.warn("Vega canvas not found");
+      //return;
+    }
+
+    // Use the position as client coordinates for event dispatch
+    const clientX = x;
+    const clientY = y;
+
+    // Find the element under the pointer or fallback to canvas
+    const target = document.elementFromPoint(clientX, clientY) ?? canvas;
+
+    if (!target){
+      return
+    }
+
+    [
+      "pointerenter",
+      "pointerover",
+      "pointermove",
+      "mouseenter",
+      "mouseover",
+      "mousemove",
+    ].forEach((type) =>
+      target.dispatchEvent(
+        new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          pointerId: 1,
+          pointerType: "mouse",
+          isPrimary: true,
+          clientX,
+          clientY,
+        })
+      )
+    );
+
+    console.log("[InteractionManager] Dispatched pointer events", {
+      clientX,
+      clientY,
+      target,
+    });
   }
 
   // ONLY USED FOR MOUSE MOCK
@@ -309,7 +385,7 @@ export class InteractionManager {
       case "move":
         handleDrag(targetId, input.position, { x: 0, y: 0 });
         break;
-      case "resize": {
+      case "resize":{
         const target = this.findTargetAt(input.position);
         if (!target) break;
         // For mouse mock, use the same position for both pointers and a default pinch distance/size
@@ -325,6 +401,10 @@ export class InteractionManager {
       case "hover":
         handleHover(targetId, input.isHovered ?? true);
         break;
+      case "point":
+        // No action needed here; pointer simulation runs in findTargetAt
+        break;
     }
   }
 }
+
