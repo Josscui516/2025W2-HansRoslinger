@@ -292,7 +292,7 @@ export class InteractionManager {
 
       if (withinBounds) {
         console.log(
-          `[Manager] Found target ${visual.assetId} under pointer at (${position.x}, ${position.y})`
+          `[Manager] Found target ${visual.assetId} under pointer at (${position.x}, ${position.y})`,
         );
 
         // Only simulate pointer events if position or target changed
@@ -362,8 +362,8 @@ export class InteractionManager {
           isPrimary: true,
           clientX,
           clientY,
-        })
-      )
+        }),
+      ),
     );
 
     console.log("[InteractionManager] Dispatched pointer events", {
@@ -407,4 +407,3 @@ export class InteractionManager {
     }
   }
 }
-
