@@ -2,6 +2,7 @@ import { handleDrag } from "./actions/handleDrag";
 import { handleResize } from "./actions/handleResize";
 import { handleHover } from "./actions/handleHover";
 import { useVisualStore } from "store/visualsSlice";
+import { usePanelStore } from "store/panelSlice";
 import {
   ActionPayload,
   ActionType,
@@ -114,6 +115,18 @@ export class InteractionManager {
       case HOVER:
         this.hoveredTargetId = target ? target.assetId : null;
         handleHover(target ? target.assetId : null, true);
+
+        const panelToggle = usePanelStore.getState().toggle;
+
+        if (point.x < 100 && point.y > 200 && point.y < 500) {
+          if (this.previousAction !== "panel-toggle") {
+            panelToggle(); // toggle open/close
+            this.previousAction = "panel-toggle"; // prevent flicker
+          }
+        } else if (this.previousAction === "panel-toggle") {
+          this.previousAction = null; // allow next toggle once hand leaves area
+        }
+
         break;
 
       case MOVE: {
