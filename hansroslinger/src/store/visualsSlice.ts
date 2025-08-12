@@ -11,6 +11,7 @@ import { persist } from "zustand/middleware";
 type VisualsState = {
   visuals: Visual[];
   pointerPosition: { x: number; y: number } | null;
+  zoom: number; // <-- Add this line
 
   setPointerPosition: (position: { x: number; y: number } | null) => void;
   setVisual: (assetId: string, data: Visual) => void;
@@ -25,6 +26,7 @@ type VisualsState = {
     assetId: string,
     useOriginalSizeOnLoad: boolean,
   ) => void;
+  setZoom: (zoom: number) => void; // <-- Add this line
 };
 
 export const useVisualStore = create<VisualsState>()(
@@ -32,6 +34,7 @@ export const useVisualStore = create<VisualsState>()(
     (set, get) => ({
       visuals: [],
       pointerPosition: null,
+      zoom: 1, // <-- Add this line
 
       setPointerPosition: (position) => set({ pointerPosition: position }),
 
@@ -106,6 +109,7 @@ export const useVisualStore = create<VisualsState>()(
               : visual,
           ),
         })),
+      setZoom: (zoom) => set({ zoom }), // <-- Add this line
     }),
     {
       name: LOCAL_STORAGE_KEY_SELECTED_UPLOAD,
