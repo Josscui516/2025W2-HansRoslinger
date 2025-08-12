@@ -327,20 +327,36 @@ export class InteractionManager {
   simulatePointerEvents(position: { x: number; y: number }) {
     if (!position) return;
 
+    // Find the visual under this position
+    const visual = this.visuals.find(v =>
+      position.x >= v.position.x &&
+      position.x <= v.position.x + v.size.width &&
+      position.y >= v.position.y &&
+      position.y <= v.position.y + v.size.height
+    );
+    if (!visual) {
+      console.warn("No visual found for pointer event simulation");
+      return;
+    }
+
     // Target the Vega canvas with class 'marks'
     const canvas = document.querySelector("canvas.marks") as HTMLCanvasElement;
-
     if (!canvas) {
       console.warn("Vega canvas with class 'marks' not found");
       return;
     }
 
     const rect = canvas.getBoundingClientRect();
-    const clientX = rect.left + position.x;
-    const clientY = rect.top + position.y;
+
+    // Offset the pointer position by the visual's position
+    const localX = position.x - visual.position.x;
+    const localY = position.y - visual.position.y;
+
+    // Map to client coordinates
+    const clientX = rect.left + localX;
+    const clientY = rect.top + localY;
 
     const target = document.elementFromPoint(clientX, clientY) ?? canvas;
-   
 
     if (!target){
       return
@@ -371,6 +387,9 @@ export class InteractionManager {
       clientX,
       clientY,
       target,
+      localX,
+      localY,
+      visual,
     });
   }
 
