@@ -12,4 +12,3 @@ export default function Preview() {
   );
 }
 
-export default Preview;

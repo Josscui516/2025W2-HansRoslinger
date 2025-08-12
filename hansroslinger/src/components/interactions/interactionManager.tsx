@@ -26,6 +26,7 @@ type GestureTrack = {
 
 type HandVisualMap = Record<HandIds, GestureTrack>;
 
+
 export class InteractionManager {
   // Clear count is added for each hand fue to flicker
   private handVisualMap: HandVisualMap = {
@@ -326,20 +327,20 @@ export class InteractionManager {
   simulatePointerEvents(position: { x: number; y: number }) {
     if (!position) return;
 
-    const { x, y } = position;
+    // Target the Vega canvas with class 'marks'
+    const canvas = document.querySelector("canvas.marks") as HTMLCanvasElement;
 
-    const canvas = document.querySelector(".vega-embed canvas");
     if (!canvas) {
-      console.warn("Vega canvas not found");
-      //return;
+      console.warn("Vega canvas with class 'marks' not found");
+      return;
     }
 
-    // Use the position as client coordinates for event dispatch
-    const clientX = x;
-    const clientY = y;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = rect.left + position.x;
+    const clientY = rect.top + position.y;
 
-    // Find the element under the pointer or fallback to canvas
     const target = document.elementFromPoint(clientX, clientY) ?? canvas;
+   
 
     if (!target){
       return
