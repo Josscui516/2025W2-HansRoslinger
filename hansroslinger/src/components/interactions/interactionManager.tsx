@@ -17,6 +17,9 @@ export class InteractionManager {
   private previousAction: ActionType | null = null;
   private hoveredTargetId: string | null = null;
 
+  private lastToggleTime: number = 0;
+  private readonly COOLDOWN_MS = 1000;
+
   /**
    * Clear threshold prevents flicker when pinch gestures are too fast.
    * Without it: pinch → empty → empty → pinch. Will result in loss of target visual
@@ -112,22 +115,24 @@ export class InteractionManager {
         this.previousAction = action;
         break;
       }
-      case HOVER:
+      case HOVER: {
         this.hoveredTargetId = target ? target.assetId : null;
         handleHover(target ? target.assetId : null, true);
 
         const panelToggle = usePanelStore.getState().toggle;
 
-        if (point.x < 100 && point.y > 200 && point.y < 500) {
-          if (this.previousAction !== "panel-toggle") {
-            panelToggle(); // toggle open/close
-            this.previousAction = "panel-toggle"; // prevent flicker
+        const now = Date.now();
+        const isInButtonArea = point.x < 100 && point.y > 200 && point.y < 500;
+
+        if (isInButtonArea) {
+          if (now - this.lastToggleTime > this.COOLDOWN_MS) {
+            panelToggle(); // Toggle open/close
+            this.lastToggleTime = now;
           }
-        } else if (this.previousAction === "panel-toggle") {
-          this.previousAction = null; // allow next toggle once hand leaves area
         }
 
         break;
+      }
 
       case MOVE: {
         // If no visual has been selected, don't move visual
