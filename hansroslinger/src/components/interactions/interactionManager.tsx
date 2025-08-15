@@ -121,6 +121,7 @@ export class InteractionManager {
 
         const panelToggle = usePanelStore.getState().toggle;
 
+        // Retrieve current time for cooldown set up
         const now = Date.now();
         const isInButtonArea = point.x < 100 && point.y > 200 && point.y < 500;
 
