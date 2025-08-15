@@ -47,6 +47,11 @@ export class InteractionManager {
     },
   };
 
+  private hoveredTargetId: string | null = null;
+  private pinchStartDistance: number | null = null; 
+  private pinchStartSize: { width: number; height: number } | null = null;
+  
+
   /**
    * Clear threshold prevents flicker when pinch gestures are too fast.
    */
