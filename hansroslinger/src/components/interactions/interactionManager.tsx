@@ -3,20 +3,20 @@ import { handleResize } from "./actions/handleResize";
 import { handleHover } from "./actions/handleHover";
 import { useVisualStore } from "store/visualsSlice";
 
-
 import {
   ActionPayload,
+  ActionType,
   HandIds,
   InteractionInput,
   Visual,
 } from "types/application";
-import {
-  HOVER,
-  LEFT,
-  LEFT_RIGHT,
-  MOVE,
-  RESIZE,
-  RIGHT,
+import { 
+  HOVER, 
+  LEFT, 
+  LEFT_RIGHT, 
+  MOVE, 
+  RESIZE, 
+  RIGHT 
 } from "constants/application";
 
 type GestureTrack = {
@@ -29,6 +29,10 @@ type HandVisualMap = Record<HandIds, GestureTrack>;
 
 
 export class InteractionManager {
+  private gestureTargetId: string | null = null;
+  private dragOffset: { x: number; y: number } | null = null;
+  private previousAction: ActionType | null = null;
+
   // Clear count is added for each hand fue to flicker
   private handVisualMap: HandVisualMap = {
     left: {
@@ -51,20 +55,12 @@ export class InteractionManager {
   private hoveredTargetId: string | null = null;
   private pinchStartDistance: number | null = null; 
   private pinchStartSize: { width: number; height: number } | null = null;
-  
-  private pinchStartDistance: number | null = null; 
-  private pinchStartSize: { width: number; height: number } | null = null;
-  
 
   /**
    * Clear threshold prevents flicker when pinch gestures are too fast.
    */
   private readonly CLEAR_THRESHOLD = 3;
   private currentClearCount = 0;
-
-  // Track last simulated pointer position and target to prevent spamming events
-  private lastSimulatedPosition: { x: number; y: number } | null = null;
-  private lastSimulatedTargetId: string | null = null;
 
   // Track last simulated pointer position and target to prevent spamming events
   private lastSimulatedPosition: { x: number; y: number } | null = null;
@@ -91,6 +87,8 @@ export class InteractionManager {
 
     const point = coordinates[0];
     const target = this.findTargetAt(point);
+
+    const isActionSameAsPrevious = this.previousAction === action;
 
     switch (action) {
       case RESIZE: {
@@ -194,6 +192,19 @@ export class InteractionManager {
           handleDrag(boundVisual.assetId, point, currentDragOffset);
           return;
         }
+        if (target) {
+          if (
+            this.gestureTargetId !== target.assetId ||
+            !isActionSameAsPrevious
+          ) {
+            this.gestureTargetId = target.assetId;
+            this.dragOffset = {
+              x: point.x - target.position.x,
+              y: point.y - target.position.y,
+            };
+          }
+          handleDrag(target.assetId, point, this.dragOffset!);
+        }
 
         // If there is a bounded object (already hovered), and current target is same as that object
         // and drag offset have not been set, means this is a new drag, calculate offset then drag
@@ -221,10 +232,14 @@ export class InteractionManager {
         const targetIdOther = this.findTargetAt(coordinates[1]);
         if (!targetIdOther || targetIdOther.assetId === this.gestureTargetId)
           return;
-        if (target) handleResize(target.assetId, point);
+        // Note: handleResize is called properly in the main RESIZE block with all required parameters
+        // This case might be redundant or should be handled differently
         break;
       }
     }
+
+    this.gestureTargetId = target ? target.assetId : null;
+    this.previousAction = action;
 
     // Update drag offset
     this.handVisualMap[actionPayload.handId].dragOffset = currentDragOffset;
@@ -236,6 +251,9 @@ export class InteractionManager {
    */
   handleClear() {
     if (this.currentClearCount === this.CLEAR_THRESHOLD) {
+      handleHover(this.gestureTargetId, false);
+      this.gestureTargetId = null;
+      this.previousAction = null;
       // Clear hover and bound visual for each hand
       Object.values(this.handVisualMap).forEach((handVisual) => {
         handleHover(
@@ -251,6 +269,9 @@ export class InteractionManager {
   }
 
   /**
+   * Finds the visual under pointer position.
+   * Also automatically runs pointer event simulation on the Vega canvas at the pointer position,
+   * but only if the position or target changed (to avoid spamming events).
    * Clear the hover markup, bound visual and drag offset for a specific hand
    * Only clear when reach threshold
    * @param handId id of hand to be cleared
@@ -303,8 +324,6 @@ export class InteractionManager {
   private findTargetAt(position: { x: number; y: number }): Visual | null {
     console.log("[Manager] Finding target at position:", position);
 
-    console.log("[Manager] Finding target at position:", position);
-
     for (const visual of [...this.visuals].reverse()) {
       const { x, y } = visual.position;
       const { width, height } = visual.size;
@@ -334,32 +353,7 @@ export class InteractionManager {
 
         return visual;
       }
-        console.log(
-          `[Manager] Found target ${visual.assetId} under pointer at (${position.x}, ${position.y})`,
-        );
-
-        // Only simulate pointer events if position or target changed
-        if (
-          !this.lastSimulatedPosition ||
-          this.lastSimulatedPosition.x !== position.x ||
-          this.lastSimulatedPosition.y !== position.y ||
-          this.lastSimulatedTargetId !== visual.assetId
-        ) {
-          this.simulatePointerEvents(position);
-          this.lastSimulatedPosition = position;
-          this.lastSimulatedTargetId = visual.assetId;
-        }
-
-        return visual;
-      }
     }
-
-    console.log("[Manager] No target found at position:", position);
-
-    // Clear last simulated state if no target
-    this.lastSimulatedPosition = null;
-    this.lastSimulatedTargetId = null;
-
 
     console.log("[Manager] No target found at position:", position);
 
@@ -373,7 +367,7 @@ export class InteractionManager {
   /**
    * Simulate mouse pointer events at given viewport coordinates.
    */
-  simulatePointerEvents(position: { x: number; y: number }) {
+  private simulatePointerEvents(position: { x: number; y: number }) {
     if (!position) return;
 
     // Find the visual under this position
@@ -407,10 +401,6 @@ export class InteractionManager {
 
     const target = document.elementFromPoint(clientX, clientY) ?? canvas;
 
-    if (!target){
-      return
-    }
-
     [
       "pointerenter",
       "pointerover",
@@ -442,6 +432,7 @@ export class InteractionManager {
     });
   }
 
+
   // ONLY USED FOR MOUSE MOCK
   handleInput(input: InteractionInput) {
     const targetId =
@@ -454,7 +445,7 @@ export class InteractionManager {
       case "move":
         handleDrag(targetId, input.position, { x: 0, y: 0 });
         break;
-      case "resize":{
+      case "resize": {
         const target = this.findTargetAt(input.position);
         if (!target) break;
         // For mouse mock, use the same position for both pointers and a default pinch distance/size
@@ -466,11 +457,9 @@ export class InteractionManager {
           { ...target.size }, // mock pinchStartSize
         );
         break;
+      }
       case "hover":
         handleHover(targetId, input.isHovered ?? true);
-        break;
-      case "point":
-        // No action needed here; pointer simulation runs in findTargetAt
         break;
       case "point":
         // No action needed here; pointer simulation runs in findTargetAt
