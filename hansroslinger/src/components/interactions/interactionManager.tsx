@@ -3,6 +3,7 @@ import { handleResize } from "./actions/handleResize";
 import { handleHover } from "./actions/handleHover";
 import { useVisualStore } from "store/visualsSlice";
 
+
 import {
   ActionPayload,
   HandIds,
@@ -51,6 +52,9 @@ export class InteractionManager {
   private pinchStartDistance: number | null = null; 
   private pinchStartSize: { width: number; height: number } | null = null;
   
+  private pinchStartDistance: number | null = null; 
+  private pinchStartSize: { width: number; height: number } | null = null;
+  
 
   /**
    * Clear threshold prevents flicker when pinch gestures are too fast.
@@ -62,12 +66,13 @@ export class InteractionManager {
   private lastSimulatedPosition: { x: number; y: number } | null = null;
   private lastSimulatedTargetId: string | null = null;
 
+  // Track last simulated pointer position and target to prevent spamming events
+  private lastSimulatedPosition: { x: number; y: number } | null = null;
+  private lastSimulatedTargetId: string | null = null;
+
   private get visuals() {
     return useVisualStore.getState().visuals;
   }
-
-  private pinchStartDistance: number | null = null;
-  private pinchStartSize: { width: number; height: number } | null = null;
 
   /**
    * Primary handler for all gesture-to-action mappings.
@@ -207,6 +212,18 @@ export class InteractionManager {
         }
         break;
       }
+
+      case HOVER:
+        handleHover(target ? target.assetId : null, true);
+        break;
+
+      case RESIZE: {
+        const targetIdOther = this.findTargetAt(coordinates[1]);
+        if (!targetIdOther || targetIdOther.assetId === this.gestureTargetId)
+          return;
+        if (target) handleResize(target.assetId, point);
+        break;
+      }
     }
 
     // Update drag offset
@@ -286,6 +303,8 @@ export class InteractionManager {
   private findTargetAt(position: { x: number; y: number }): Visual | null {
     console.log("[Manager] Finding target at position:", position);
 
+    console.log("[Manager] Finding target at position:", position);
+
     for (const visual of [...this.visuals].reverse()) {
       const { x, y } = visual.position;
       const { width, height } = visual.size;
@@ -315,7 +334,32 @@ export class InteractionManager {
 
         return visual;
       }
+        console.log(
+          `[Manager] Found target ${visual.assetId} under pointer at (${position.x}, ${position.y})`,
+        );
+
+        // Only simulate pointer events if position or target changed
+        if (
+          !this.lastSimulatedPosition ||
+          this.lastSimulatedPosition.x !== position.x ||
+          this.lastSimulatedPosition.y !== position.y ||
+          this.lastSimulatedTargetId !== visual.assetId
+        ) {
+          this.simulatePointerEvents(position);
+          this.lastSimulatedPosition = position;
+          this.lastSimulatedTargetId = visual.assetId;
+        }
+
+        return visual;
+      }
     }
+
+    console.log("[Manager] No target found at position:", position);
+
+    // Clear last simulated state if no target
+    this.lastSimulatedPosition = null;
+    this.lastSimulatedTargetId = null;
+
 
     console.log("[Manager] No target found at position:", position);
 
@@ -422,9 +466,11 @@ export class InteractionManager {
           { ...target.size }, // mock pinchStartSize
         );
         break;
-      }
       case "hover":
         handleHover(targetId, input.isHovered ?? true);
+        break;
+      case "point":
+        // No action needed here; pointer simulation runs in findTargetAt
         break;
       case "point":
         // No action needed here; pointer simulation runs in findTargetAt
