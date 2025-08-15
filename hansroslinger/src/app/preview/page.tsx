@@ -1,14 +1,25 @@
 "use client";
 
-import CameraFeed from "./CameraFeed";
-import KonvaOverlay from "@/components/KonvaOverlay";
+import dynamic from "next/dynamic";
 
-export default function Preview() {
+import CanvasOverlay from "@/components/KonvaOverlay";
+
+const CameraFeed = dynamic(() => import("./CameraFeed"), {
+  ssr: false,
+});
+
+const Preview = () => {
   return (
-    <div className="relative w-full max-w-full">
-      <CameraFeed />
-      <KonvaOverlay />
+    <div className="flex justify-center px-4 sm:px-8">
+      <div
+        className="relative w-full max-w-full sm:max-w-2xl md:max-w-4xl lg:max-w-6xl xl:max-w-7xl 
+        aspect-video border-2 border-black overflow-hidden bg-black"
+      >
+        <CameraFeed />
+        <CanvasOverlay />
+      </div>
     </div>
   );
-}
+};
 
+export default Preview;
