@@ -20,6 +20,9 @@ export class InteractionManager {
   private lastToggleTime: number = 0;
   private readonly COOLDOWN_MS = 1000;
 
+  private lastSelectTimes: Record<string, number> = {};
+  private readonly SELECT_COOLDOWN_MS = 3000;
+
   /**
    * Clear threshold prevents flicker when pinch gestures are too fast.
    * Without it: pinch → empty → empty → pinch. Will result in loss of target visual
@@ -120,17 +123,49 @@ export class InteractionManager {
         handleHover(target ? target.assetId : null, true);
 
         const panelToggle = usePanelStore.getState().toggle;
+        const addSelectedUpload = useVisualStore.getState().addSelectedUpload;
+        const removeSelectedUpload = useVisualStore.getState().removeVisual;
+        const visuals = useVisualStore.getState().visuals;
 
-        // Retrieve current time for cooldown set up
         const now = Date.now();
-        const isInButtonArea = point.x < 100 && point.y > 200 && point.y < 500;
 
-        if (isInButtonArea) {
-          if (now - this.lastToggleTime > this.COOLDOWN_MS) {
-            panelToggle(); // Toggle open/close
-            this.lastToggleTime = now;
-          }
+        // panel button toggle
+        const isInButtonArea = point.x < 100 && point.y > 200 && point.y < 500;
+        if (isInButtonArea && now - this.lastToggleTime > this.COOLDOWN_MS) {
+          panelToggle(); // open or close the panel
+          this.lastToggleTime = now;
         }
+
+        // hand pointing for select/unselect
+        const thumbnailElements = document.querySelectorAll("[data-asset-id]");
+        thumbnailElements.forEach((element) => {
+          const assetId = element.getAttribute("data-asset-id");
+          if (!assetId) return;
+
+          const rect = element.getBoundingClientRect();
+          const isPointing =
+            point.x >= rect.left &&
+            point.x <= rect.right &&
+            point.y >= rect.top &&
+            point.y <= rect.bottom;
+
+          if (isPointing) {
+            const last = this.lastSelectTimes[assetId] || 0;
+            if (now - last > this.SELECT_COOLDOWN_MS) {
+              const isAlreadySelected = visuals.some((v) => v.assetId === assetId);
+              const uploadData = (window as any).hardcodedUploads?.[assetId]; // fallback if global
+
+              if (uploadData) {
+                if (isAlreadySelected) {
+                  removeSelectedUpload(assetId);
+                } else {
+                  addSelectedUpload(assetId, uploadData);
+                }
+                this.lastSelectTimes[assetId] = now;
+              }
+            }
+          }
+        });
 
         break;
       }
