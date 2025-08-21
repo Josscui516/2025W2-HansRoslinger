@@ -57,7 +57,7 @@ export const useVisualStore = create<VisualsState>()(
           const visual: Visual = {
             assetId,
             uploadData,
-            position: { x: 0, y: 0 },
+            position: { x: 980, y: 0 },  // Test for top left of preview screen
             size: { width: 300, height: 200 },
             isHovered: false,
             // When selected, should default to original size
