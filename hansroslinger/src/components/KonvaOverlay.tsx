@@ -12,6 +12,7 @@ import { useGestureListener } from "./interactions/useGestureListener";
 import { FeedbackDisplay } from "./interactions/actions/handleFeedback";
 
 import ClearButton from "./ClearButton";
+import TrashCan from "./TrashCan";
 
 const CanvasOverlay = () => {
   const visuals = useVisualStore((state) => state.visuals);
@@ -93,6 +94,7 @@ const CanvasOverlay = () => {
             return null;
           })}
 
+          <TrashCan />
           <ClearButton />
         </div>
       )}
