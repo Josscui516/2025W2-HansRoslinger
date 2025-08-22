@@ -349,11 +349,12 @@ export class InteractionManager {
     if (!position) return;
 
     // Find the visual under this position
-    const visual = this.visuals.find(v =>
-      position.x >= v.position.x &&
-      position.x <= v.position.x + v.size.width &&
-      position.y >= v.position.y &&
-      position.y <= v.position.y + v.size.height
+    const visual = this.visuals.find(
+      (v) =>
+        position.x >= v.position.x &&
+        position.x <= v.position.x + v.size.width &&
+        position.y >= v.position.y &&
+        position.y <= v.position.y + v.size.height,
     );
     if (!visual) {
       console.warn("No visual found for pointer event simulation");
@@ -377,7 +378,10 @@ export class InteractionManager {
     const clientX = rect.left + localX;
     const clientY = rect.top + localY;
 
-    const target = document.elementFromPoint(clientX, clientY) ?? canvas;
+    // Always dispatch events directly to the Vega canvas so the overlay
+    // doesn't intercept them. Using `elementFromPoint` here would return the
+    // overlay div, preventing Vega from receiving pointer events for tooltips.
+    const target = canvas;
 
     [
       "pointerenter",
@@ -409,7 +413,6 @@ export class InteractionManager {
       visual,
     });
   }
-
 
   // ONLY USED FOR MOUSE MOCK
   handleInput(input: InteractionInput) {
