@@ -10,7 +10,7 @@ const ClearButton = () => {
       onClick={clearVisual}
       style={{
         position: "fixed",
-        bottom: 20,
+        bottom: 100,
         right: 20,
         padding: "10px 16px",
         backgroundColor: "#ef4444",
