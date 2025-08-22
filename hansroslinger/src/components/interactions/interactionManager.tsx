@@ -65,6 +65,28 @@ export class InteractionManager {
   private pinchStartDistance: number | null = null;
   private pinchStartSize: { width: number; height: number } | null = null;
 
+  // Remove visual if it's dropped inside the trash area
+  private removeIfInTrash(visual: Visual | null) {
+    if (!visual) return;
+    const trash = document.getElementById("trash-can");
+    if (!trash) return;
+    const rect = trash.getBoundingClientRect();
+    const vLeft = visual.position.x;
+    const vTop = visual.position.y;
+    const vRight = vLeft + visual.size.width;
+    const vBottom = vTop + visual.size.height;
+
+    const intersects =
+      vLeft < rect.right &&
+      vRight > rect.left &&
+      vTop < rect.bottom &&
+      vBottom > rect.top;
+
+    if (intersects) {
+      useVisualStore.getState().removeVisual(visual.assetId);
+    }
+  }
+
   // Call this after a mode switch to reset transient state
   resetTransientState() {
     // Clear hover on any currently bound visuals (for all hands)
@@ -239,6 +261,7 @@ export class InteractionManager {
     if (this.currentClearCount === this.CLEAR_THRESHOLD) {
       // Clear hover and bound visual for each hand
       Object.values(this.handVisualMap).forEach((handVisual) => {
+        this.removeIfInTrash(handVisual.visual);
         handleHover(
           handVisual.visual ? handVisual.visual.assetId : null,
           false,
@@ -266,6 +289,8 @@ export class InteractionManager {
       const currentVisual = currentHand.visual;
       const otherVisual = otherHand.visual;
       const resizeVisual = this.handVisualMap[LEFT_RIGHT].visual;
+
+      this.removeIfInTrash(currentVisual);
 
       // Only remove hover markup if:
       //    - current and other hand have a visual bounded
@@ -349,11 +374,12 @@ export class InteractionManager {
     if (!position) return;
 
     // Find the visual under this position
-    const visual = this.visuals.find(v =>
-      position.x >= v.position.x &&
-      position.x <= v.position.x + v.size.width &&
-      position.y >= v.position.y &&
-      position.y <= v.position.y + v.size.height
+    const visual = this.visuals.find(
+      (v) =>
+        position.x >= v.position.x &&
+        position.x <= v.position.x + v.size.width &&
+        position.y >= v.position.y &&
+        position.y <= v.position.y + v.size.height,
     );
     if (!visual) {
       console.warn("No visual found for pointer event simulation");
@@ -409,7 +435,6 @@ export class InteractionManager {
       visual,
     });
   }
-
 
   // ONLY USED FOR MOUSE MOCK
   handleInput(input: InteractionInput) {
